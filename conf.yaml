@@ -4,9 +4,11 @@ STUDY_NAME : "Wendsday"
 competencia01:
   DATA_PATH: "data/competencia_01.csv"
   SEMILLA: 143287
-  MES_TRAIN : 202102
-  MES_VAL : 202103
+  MES_TRAIN : [202101,202102]
+  MES_VAL : [202103]
   MES_TEST : 202104
+  FINAL_TRAIN: [202101,202102,202103,202104]
+  FINAL_PREDIC: 202106
   GANACIA_ACIERTO: 780000
   COSTO_ESTIMULO: -20000
   PARAM_CORTE: [6000,19000]
@@ -51,7 +53,7 @@ parametros_lgbm:
 
 
 hiperparam_bo:
-  UNDERSUMPLING: 0.1 # 0.0 < UNDERSUMPLING <= 1.0. De los continua,0.1 es el 10% del total de los continua.
+  UNDERSUMPLING: 0.3 # 0.0 < UNDERSUMPLING <= 1.0. De los continua,0.1 es el 10% del total de los continua.
   VAL_FOLDS_BO: 5 # cantidad de folds para validacion cruzada en la busqueda de hiperparametros
   N_TRIALS: 50 # cantidad de ensayos en la busqueda de hiper
   hs:

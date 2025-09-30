@@ -1,4 +1,5 @@
 import optuna
+import copy
 import lightgbm as lgb
 import pandas as pd
 import numpy as np
@@ -32,33 +33,33 @@ def objetivo_ganancia(trial, df) -> float:
     """
     logger.info(f"Iniciando trial {trial.number} - DataFrame shape: {df.shape}")
     
-    # VERIFICAR EXISTENCIA DE TARGET
-    target_col = 'clase_ternaria'  # o la que uses
-    logger.info(f"Target column '{target_col}' existe: {target_col in df.columns}")
-    
-    if target_col in df.columns:
-        dist = df[target_col].value_counts()
-        logger.info(f"Distribución de {target_col}: {dist.to_dict()}")
-        logger.info(f"Total de filas con target: {len(df)}")
-    else:
-        logger.error(f"Target column '{target_col}' no encontrada")
-        return 0.0
-    
-    # VERIFICAR FILTRADO POR FECHAS
-    if 'foto_mes' in df.columns:
-        meses_unicos = df['foto_mes'].unique()
-        logger.info(f"Meses únicos en datos: {sorted(meses_unicos)}")
-        logger.info(f"MES_TRAIN: {MES_TRAIN}, MES_VALID: {MES_VALIDACION}")
-        
-        # Verificar cuántos datos hay para train
-        train_data = df[df['foto_mes'] == MES_TRAIN]
-        logger.info(f"Filas para MES_TRAIN ({MES_TRAIN}): {len(train_data)}")
-        
-        if len(train_data) == 0:
-            logger.error(f"❌ NO HAY DATOS para MES_TRAIN = {MES_TRAIN}")
-            return 0.0
-    else:
-        logger.warning("No hay columna 'foto_mes' para filtrar por fecha")
+#    # VERIFICAR EXISTENCIA DE TARGET
+#    target_col = 'clase_ternaria'  # o la que uses
+#    logger.info(f"Target column '{target_col}' existe: {target_col in df.columns}")
+#    
+#    if target_col in df.columns:
+#        dist = df[target_col].value_counts()
+#        logger.info(f"Distribución de {target_col}: {dist.to_dict()}")
+#        logger.info(f"Total de filas con target: {len(df)}")
+#    else:
+#        logger.error(f"Target column '{target_col}' no encontrada")
+#        return 0.0
+#    
+#    # VERIFICAR FILTRADO POR FECHAS
+#    if 'foto_mes' in df.columns:
+#        meses_unicos = df['foto_mes'].unique()
+#        logger.info(f"Meses únicos en datos: {sorted(meses_unicos)}")
+#        logger.info(f"MES_TRAIN: {MES_TRAIN}, MES_VALID: {MES_VALIDACION}")
+#        
+#        # Verificar cuántos datos hay para train
+#        train_data = df[df['foto_mes'] == MES_TRAIN]
+#        logger.info(f"Filas para MES_TRAIN ({MES_TRAIN}): {len(train_data)}")
+#        
+#        if len(train_data) == 0:
+#            logger.error(f"❌ NO HAY DATOS para MES_TRAIN = {MES_TRAIN}")
+#            return 0.0
+#    else:
+#        logger.warning("No hay columna 'foto_mes' para filtrar por fecha")
 
     
     # Log de dimensiones iniciales
@@ -86,7 +87,15 @@ def objetivo_ganancia(trial, df) -> float:
     # ===============================
     # 3. Dataset con undersampling
     # ===============================
-    df_train = df[df["foto_mes"].isin([MES_TRAIN, MES_VALIDACION])]  # meses a usar
+    
+    if isinstance(MES_TRAIN,list):
+        periodos_entrenamiento = MES_TRAIN + MES_VALIDACION
+    else:
+        periodos_entrenamiento = [MES_TRAIN, MES_VALIDACION]
+        
+    logger.info(f"Períodos de entrenamiento: {periodos_entrenamiento}")
+        
+    df_train = df[df["foto_mes"].isin(periodos_entrenamiento)]  # meses a usar
     
 
     # Separar clases
@@ -94,10 +103,10 @@ def objetivo_ganancia(trial, df) -> float:
     df_neg = df_train[df_train["clase_ternaria"] == 0]
 
     frac = HIPERPARAM_BO["UNDERSUMPLING"]  
-    df_neg_sample = df_neg.sample(frac=frac, random_state=SEMILLA)
+    df_neg_sample = df_neg.sample(frac=frac, random_state=314159)
 
     df_sub = pd.concat([df_pos, df_neg_sample])
-    df_sub = df_sub.sample(frac=1, random_state=SEMILLA)  # mezclar
+    df_sub = df_sub.sample(frac=1, random_state=314159)  # mezclar
 
     X, y = df_sub.drop("clase_ternaria", axis=1), df_sub["clase_ternaria"]
     dtrain = lgb.Dataset(X, label=y)
@@ -228,4 +237,90 @@ def optimizar(df, n_trials=100) -> optuna.Study:
   
     return study
 
+def evaluar_en_test(df, mejores_params) -> dict:
+    """
+    Evalúa el modelo con los mejores hiperparámetros en el conjunto de test.
+    Solo calcula la ganancia, sin usar sklearn.
+  
+    Args:
+        df: DataFrame con todos los datos
+        mejores_params: Mejores hiperparámetros encontrados por Optuna
+  
+    Returns:
+        dict: Resultados de la evaluación en test (ganancia + estadísticas básicas)
+    """
+    logger.info("=== EVALUACIÓN EN CONJUNTO DE TEST ===")
+    logger.info(f"Período de test: {MES_TEST}")
+  
+    # Preparar datos de entrenamiento (TRAIN + VALIDACION)
+    if isinstance(MES_TRAIN, list):
+        periodos_entrenamiento = MES_TRAIN + MES_VALIDACION
+    else:
+        periodos_entrenamiento = [MES_TRAIN, MES_VALIDACION]
+  
+    df_train_completo = df[df['foto_mes'].isin(periodos_entrenamiento)]
+    df_test = df[df['foto_mes'] == MES_TEST]
+  
+    # Entrenar modelo con mejores parámetros
+    # ... Implementar entrenamiento y test con la logica de entrenamiento FINAL para mayor detalle
+    # recordar realizar todos los df necesarios y utilizar lgb.train()
+    # Preparamos los datos para el modelo final.
+    X,y = df_train_completo.drop("clase_ternaria", axis=1),df_train_completo["clase_ternaria"]
+    dtrain = lgb.Dataset(X,label=y)
+    
+    # Armamos los datos de test
+    X_test = df_test.drop("clase_ternaria", axis=1)
+    y_test = df_test["clase_ternaria"]
+    
+    # Indicamos los mejores hiperparámetros
+    params_base = LGBM_PARAMS_BASE
+    params_final = params_base.copy()
+    params_final.update(mejores_params)
+    
+    # Normalizamos ciertos parámetros
+    param_normalizado = copy.deepcopy(params_final)
+    param_normalizado['min_data_in_leaf'] = round(params_final['min_data_in_leaf'] / HIPERPARAM_BO['UNDERSUMPLING'])
+    
+    
+    modelo_test = lgb.train(
+        param_normalizado,
+        dtrain)
+    
+    # Importancia de variables
+    importancia = modelo_test.feature_importance(importance_type='gain')
+    nombres = modelo_test.feature_name()
+    df_importancia = pd.DataFrame({'feature': nombres, 'importance': importancia})
+    df_importancia = df_importancia.sort_values(by='importance', ascending=False)
+    df_importancia.to_csv(f"resultados/importancia_{STUDY_NAME}.csv")
+    
+    # Predecir en test
+    y_pred = modelo_test.predict(X_test)
+    
+    # Lo que en realidad quiero es poder calcular la ganancia para diferentes umbrales. COMPLETAR!
+    y_pred_binary = (y_pred > 0.025).astype(int)
+  
+    # Calcular solo la ganancia
+    ganancia_test = calcular_ganancia(y_test, y_pred_binary)
+  
+    # Estadísticas básicas
+    total_predicciones = len(y_pred_binary)
+    predicciones_positivas = np.sum(y_pred_binary == 1)
+    porcentaje_positivas = (predicciones_positivas / total_predicciones) * 100
+  
+    resultados = {
+        'ganancia_test': float(ganancia_test),
+        'total_predicciones': int(total_predicciones),
+        'predicciones_positivas': int(predicciones_positivas),
+        'porcentaje_positivas': float(porcentaje_positivas)
+    }
+  
+    return resultados
+
+#def guardar_resultados_test(resultados_test, archivo_base=None):
+#    """
+#    Guarda los resultados de la evaluación en test en un archivo JSON.
+#    """
+#    # Guarda en resultados/{STUDY_NAME}_test_results.json
+#    # ... Implementar utilizando la misma logica que cuando guardamos una iteracion de la Bayesiana
+#
     

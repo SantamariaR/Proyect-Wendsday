@@ -16,15 +16,19 @@ try:
         STUDY_NAME = _cfgGeneral.get("STUDY_NAME", "Wendsday")
         DATA_PATH = _cfg.get("DATA_PATH", "../data/competencia.csv")
         SEMILLA = _cfg.get("SEMILLA", [42])
-        MES_TRAIN = _cfg.get("MES_TRAIN", "202102")
-        MES_VALIDACION = _cfg.get("MES_VAL", "202103")
-        MES_TEST = _cfg.get("MES_TEST", "202104")
+        MES_TRAIN = _cfg.get("MES_TRAIN", 202102)
+        MES_VALIDACION = _cfg.get("MES_VAL", 202103)
+        MES_TEST = _cfg.get("MES_TEST", 202104)
         GANANCIA_ACIERTO = _cfg.get("GANACIA_ACIERTO", None)
         COSTO_ESTIMULO = _cfg.get("COSTO_ESTIMULO", None)
         
         # Para LightGBM y Optuna
         LGBM_PARAMS_BASE = _cfgGeneral["parametros_lgbm"]
         HIPERPARAM_BO = _cfgGeneral["hiperparam_bo"]
+        
+        # Configuración para entrenamiento final
+        FINAL_TRAIN = _cfg.get("FINAL_TRAIN", [202101, 202102, 202103, 202104])
+        FINAL_PREDIC = _cfg.get("FINAL_PREDIC", 202106)
      
 
 except Exception as e:
