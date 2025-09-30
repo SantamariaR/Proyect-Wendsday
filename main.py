@@ -12,7 +12,7 @@ from src.conf import *
 # Cofiguracion de logging
 os.makedirs("logs", exist_ok=True)
 
-fecha = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+fecha = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 nombre_log = f"log_{fecha}.log"
 logging.basicConfig(
                     level=logging.DEBUG,
@@ -52,6 +52,7 @@ def main():
   
     # 3. Convertir clase_ternaria a binario
     df_fe = convertir_clase_ternaria_a_target(df_fe)
+   
   
     # 4. Ejecutar optimización (función simple)
     study = optimizar(df_fe, n_trials=100)

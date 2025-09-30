@@ -2,6 +2,7 @@ import optuna
 import lightgbm as lgb
 import pandas as pd
 import numpy as np
+import sklearn
 import logging
 import json
 import os
@@ -29,26 +30,107 @@ def objetivo_ganancia(trial, df) -> float:
     Returns:
     float: ganancia total
     """
-    # Hiperparámetros a optimizar
-    params = {
-        'objective': 'binary',
-        'metric': 'None',  # Usamos nuestra métrica personalizada
+    logger.info(f"Iniciando trial {trial.number} - DataFrame shape: {df.shape}")
+    
+    # VERIFICAR EXISTENCIA DE TARGET
+    target_col = 'clase_ternaria'  # o la que uses
+    logger.info(f"Target column '{target_col}' existe: {target_col in df.columns}")
+    
+    if target_col in df.columns:
+        dist = df[target_col].value_counts()
+        logger.info(f"Distribución de {target_col}: {dist.to_dict()}")
+        logger.info(f"Total de filas con target: {len(df)}")
+    else:
+        logger.error(f"Target column '{target_col}' no encontrada")
+        return 0.0
+    
+    # VERIFICAR FILTRADO POR FECHAS
+    if 'foto_mes' in df.columns:
+        meses_unicos = df['foto_mes'].unique()
+        logger.info(f"Meses únicos en datos: {sorted(meses_unicos)}")
+        logger.info(f"MES_TRAIN: {MES_TRAIN}, MES_VALID: {MES_VALIDACION}")
+        
+        # Verificar cuántos datos hay para train
+        train_data = df[df['foto_mes'] == MES_TRAIN]
+        logger.info(f"Filas para MES_TRAIN ({MES_TRAIN}): {len(train_data)}")
+        
+        if len(train_data) == 0:
+            logger.error(f"❌ NO HAY DATOS para MES_TRAIN = {MES_TRAIN}")
+            return 0.0
+    else:
+        logger.warning("No hay columna 'foto_mes' para filtrar por fecha")
 
-	#completar a gusto!!!!!!!
+    
+    # Log de dimensiones iniciales
+    logger.info(f"Iniciando trial {trial.number} - DataFrame shape: {df.shape}")
 
-        'random_state': SEMILLA,  # Desde configuración YAML
-    }
-  
-    # Completar!!!!!!
+    # ===============================
+    # 1. Cargar parámetros base
+    # ===============================
+    params = LGBM_PARAMS_BASE.copy()
+    hs = HIPERPARAM_BO["hs"]
 
-    ganancia_total = calcular_ganancia(y_val, y_pred_binary)
+    # 2. Reemplazar hiperparámetros con Optuna
+    for hparam, cfg in hs.items():
+        tipo = cfg["type"]
+        lower, upper = cfg["lower"], cfg["upper"]
 
-    # Guardar cada iteración en JSON
-    guardar_iteracion(trial, ganancia_total)
-  
-    logger.debug(f"Trial {trial.number}: Ganancia = {ganancia_total:,.0f}")
-  
-    return ganancia_total
+        if tipo == "integer":
+            params[hparam] = trial.suggest_int(hparam, lower, upper)
+        elif tipo == "float":
+            if "log" in cfg and cfg["log"]:
+                params[hparam] = trial.suggest_float(hparam, lower, upper, log=True)
+            else:
+                params[hparam] = trial.suggest_float(hparam, lower, upper)
+
+    # ===============================
+    # 3. Dataset con undersampling
+    # ===============================
+    df_train = df[df["foto_mes"].isin([MES_TRAIN, MES_VALIDACION])]  # meses a usar
+    
+
+    # Separar clases
+    df_pos = df_train[df_train["clase_ternaria"] == 1]
+    df_neg = df_train[df_train["clase_ternaria"] == 0]
+
+    frac = HIPERPARAM_BO["UNDERSUMPLING"]  
+    df_neg_sample = df_neg.sample(frac=frac, random_state=SEMILLA)
+
+    df_sub = pd.concat([df_pos, df_neg_sample])
+    df_sub = df_sub.sample(frac=1, random_state=SEMILLA)  # mezclar
+
+    X, y = df_sub.drop("clase_ternaria", axis=1), df_sub["clase_ternaria"]
+    dtrain = lgb.Dataset(X, label=y)
+    
+    logger.info(f"Dataset de entrenamiento preparado: {X.shape}, Positivos: {y.sum()}, Negativos: {len(y)-y.sum()} (undersampling {frac})")
+
+    # ===============================
+    # 4. K-fold cross validation
+    # ===============================
+    folds = HIPERPARAM_BO["VAL_FOLDS_BO"]
+
+    resultados = lgb.cv(
+        params,
+        dtrain,
+        num_boost_round=params.get("num_iterations", 5000),
+        nfold=folds,
+        stratified=True,
+        shuffle=True,
+        feval=ganancia_lgb_binary,
+        seed=SEMILLA
+        )
+    print("Claves disponibles en resultados:", resultados.keys())
+
+    # ===============================
+    # 5. Resultado promedio
+    # ===============================
+    ganancia_promedio = max(resultados["valid ganancia-mean"])
+
+    guardar_iteracion(trial, ganancia_promedio)
+    
+    logger.debug(f"Trial {trial.number}: Ganancia = {ganancia_promedio:,.0f}")
+    return ganancia_promedio
+
 
 
 def guardar_iteracion(trial, ganancia, archivo_base=None):
@@ -123,11 +205,21 @@ def optimizar(df, n_trials=100) -> optuna.Study:
     """
 
     study_name = STUDY_NAME
+    
 
     logger.info(f"Iniciando optimización con {n_trials} trials")
     logger.info(f"Configuración: TRAIN={MES_TRAIN}, VALID={MES_VALIDACION}, SEMILLA={SEMILLA}")
   
-    # Completar!!!!!!!!
+    # Crear estudio
+    study = optuna.create_study(
+        study_name=study_name,
+        direction="maximize",  # queremos maximizar ganancia
+        sampler=optuna.samplers.TPESampler(seed=SEMILLA)  # bayesiana
+    )
+
+    # Ejecutar optimización
+    study.optimize(lambda trial: objetivo_ganancia(trial, df), n_trials=n_trials)
+
   
     # Resultados
     logger.info(f"Mejor ganancia: {study.best_value:,.0f}")

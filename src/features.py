@@ -48,7 +48,7 @@ def feature_engineering_lag(df: pd.DataFrame, attributos: list[str], cant_lag: i
     con.close()
     
     
-    print(df.head())
+    #print(df.head())
     logger.info(f"Variables rezagadas creadas exitosamente. Dataset resultante tiene {df.shape[0]} filas y {df.shape[1]} columnas.")
     
     return df

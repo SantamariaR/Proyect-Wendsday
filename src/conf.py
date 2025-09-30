@@ -17,10 +17,15 @@ try:
         DATA_PATH = _cfg.get("DATA_PATH", "../data/competencia.csv")
         SEMILLA = _cfg.get("SEMILLA", [42])
         MES_TRAIN = _cfg.get("MES_TRAIN", "202102")
-        MES_VALIDACION = _cfg.get("MES_VALIDACION", "202103")
+        MES_VALIDACION = _cfg.get("MES_VAL", "202103")
         MES_TEST = _cfg.get("MES_TEST", "202104")
-        GANANCIA_ACIERTO = _cfg.get("GANANCIA_ACIERTO", None)
+        GANANCIA_ACIERTO = _cfg.get("GANACIA_ACIERTO", None)
         COSTO_ESTIMULO = _cfg.get("COSTO_ESTIMULO", None)
+        
+        # Para LightGBM y Optuna
+        LGBM_PARAMS_BASE = _cfgGeneral["parametros_lgbm"]
+        HIPERPARAM_BO = _cfgGeneral["hiperparam_bo"]
+     
 
 except Exception as e:
     logger.error(f"Error al cargar el archivo de configuracion: {e}")
