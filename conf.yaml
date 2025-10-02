@@ -1,4 +1,4 @@
-STUDY_NAME : "Wendsday"
+STUDY_NAME : "Wendsday_pruba_undersampling_2"
 
 
 competencia01:
@@ -53,18 +53,18 @@ parametros_lgbm:
 
 
 hiperparam_bo:
-  UNDERSUMPLING: 0.3 # 0.0 < UNDERSUMPLING <= 1.0. De los continua,0.1 es el 10% del total de los continua.
+  UNDERSUMPLING: 0.5 # 0.0 < UNDERSUMPLING <= 1.0. De los continua,0.1 es el 10% del total de los continua.
   VAL_FOLDS_BO: 5 # cantidad de folds para validacion cruzada en la busqueda de hiperparametros
-  N_TRIALS: 50 # cantidad de ensayos en la busqueda de hiper
+  N_TRIALS: 70 # cantidad de ensayos en la busqueda de hiper
   hs:
     num_iterations:
       type: integer
       lower: 2048
-      upper: 2090
+      upper: 4096
     learning_rate:
       type: float
       lower: 0.002
-      upper: 0.2
+      upper: 0.8
       log: true
     feature_fraction:
       type: float
@@ -73,7 +73,7 @@ hiperparam_bo:
     num_leaves:
       type: integer
       lower: 2
-      upper: 64
+      upper: 82
     min_data_in_leaf:
       type: integer
       lower: 1

@@ -70,13 +70,13 @@ def entrenar_modelo_final(X_train: pd.DataFrame, y_train: pd.Series, mejores_par
     dtrain = lgb.Dataset(X_train, label=y_train)
     
     # Indicamos los mejores hiperparámetros
-    params_base = LGBM_PARAMS_BASE
-    params_final = params_base.copy()
-    params_final.update(mejores_params)
-    
-    # Normalizamos ciertos parámetros
-    param_normalizado = copy.deepcopy(params_final)
-    param_normalizado['min_data_in_leaf'] = round(params_final['min_data_in_leaf'] / HIPERPARAM_BO['UNDERSUMPLING'])
+#    params_base = LGBM_PARAMS_BASE
+#    params_final = params_base.copy()
+#    params_final.update(mejores_params)
+#    
+#    # Normalizamos ciertos parámetros
+#    param_normalizado = copy.deepcopy(params_final)
+#    param_normalizado['min_data_in_leaf'] = round(params_final['min_data_in_leaf'] / HIPERPARAM_BO['UNDERSUMPLING'])
     
      # Configurar parámetros del modelo
     params = {
@@ -84,7 +84,7 @@ def entrenar_modelo_final(X_train: pd.DataFrame, y_train: pd.Series, mejores_par
         'metric': 'None',  # Usamos nuestra métrica personalizada
         'random_state': SEMILLA[0] if isinstance(SEMILLA, list) else SEMILLA,
         'verbose': -1,
-        **param_normalizado  # Agregar los mejores hiperparámetros
+        **mejores_params  # Agregar los mejores hiperparámetros
     }
   
     logger.info(f"Parámetros del modelo: {params}")

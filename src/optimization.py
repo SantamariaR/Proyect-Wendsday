@@ -10,6 +10,9 @@ import os
 from datetime import datetime
 from src.conf import *
 from src.gain_function import calcular_ganancia, ganancia_lgb_binary
+from sklearn.metrics import mean_squared_error
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +131,7 @@ def objetivo_ganancia(trial, df) -> float:
         feval=ganancia_lgb_binary,
         seed=SEMILLA
         )
+    
     print("Claves disponibles en resultados:", resultados.keys())
 
     # ===============================
@@ -194,7 +198,7 @@ def guardar_iteracion(trial, ganancia, archivo_base=None):
     logger.info(f"Ganancia: {ganancia:,.0f}" + "---" + "Parámetros: {params}")
 
 
-def optimizar(df, n_trials=100) -> optuna.Study:
+def optimizar(df, n_trials=1) -> optuna.Study:
     """
     Args:
         df: DataFrame con datos
@@ -229,6 +233,14 @@ def optimizar(df, n_trials=100) -> optuna.Study:
     # Ejecutar optimización
     study.optimize(lambda trial: objetivo_ganancia(trial, df), n_trials=n_trials)
 
+   
+    # Normalizamos ciertos parámetros. HABRÍA QUE HACERLO DURANTE EL ENTRENAMIENTO?
+    update_dict = {
+        'min_data_in_leaf': round(study.best_params['min_data_in_leaf'] / HIPERPARAM_BO['UNDERSUMPLING'])
+    }
+    
+    # Actualizar el diccionario de best_params
+    study.best_params.update(update_dict)   
   
     # Resultados
     logger.info(f"Mejor ganancia: {study.best_value:,.0f}")
@@ -301,6 +313,10 @@ def evaluar_en_test(df, mejores_params) -> dict:
   
     # Calcular solo la ganancia
     ganancia_test = calcular_ganancia(y_test, y_pred_binary)
+    
+    # Calculo el MSE
+    mse = mean_squared_error(y_test, y_pred_binary)
+    
   
     # Estadísticas básicas
     total_predicciones = len(y_pred_binary)
@@ -311,16 +327,41 @@ def evaluar_en_test(df, mejores_params) -> dict:
         'ganancia_test': float(ganancia_test),
         'total_predicciones': int(total_predicciones),
         'predicciones_positivas': int(predicciones_positivas),
-        'porcentaje_positivas': float(porcentaje_positivas)
+        'porcentaje_positivas': float(porcentaje_positivas),
+        'mse': float(mse)
     }
   
     return resultados
 
-#def guardar_resultados_test(resultados_test, archivo_base=None):
+def guardar_resultados_test(resultados_test, archivo_base=None):
 #    """
 #    Guarda los resultados de la evaluación en test en un archivo JSON.
 #    """
 #    # Guarda en resultados/{STUDY_NAME}_test_results.json
 #    # ... Implementar utilizando la misma logica que cuando guardamos una iteracion de la Bayesiana
-#
+
+    if archivo_base is None:
+        archivo_base = STUDY_NAME
+  
+    # Nombre del archivo único para todas las iteraciones
+    archivo = f"resultados/{STUDY_NAME}_test_results.json"
+
+    # Cargar datos existentes si el archivo ya existe
+    if os.path.exists(archivo):
+        with open(archivo, 'r') as f:
+            try:
+                datos_existentes = json.load(f)
+                if not isinstance(datos_existentes, list):
+                    datos_existentes = []
+            except json.JSONDecodeError:
+                datos_existentes = []
+    else:
+        datos_existentes = []
+  
+    # Agregar nueva iteración
+    datos_existentes.append(resultados_test)
+  
+    # Guardar todas las iteraciones en el archivo
+    with open(archivo, 'w') as f:
+        json.dump(datos_existentes, f, indent=2)
     

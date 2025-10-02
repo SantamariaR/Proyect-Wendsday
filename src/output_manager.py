@@ -11,7 +11,7 @@ def guardar_predicciones_finales(resultados_df: pd.DataFrame, nombre_archivo=Non
     Guarda las predicciones finales en un archivo CSV en la carpeta predict.
   
     Args:
-        resultados_df: DataFrame con numero_cliente y predict
+        resultados_df: DataFrame con numero_de_cliente y predict
         nombre_archivo: Nombre del archivo (si es None, usa STUDY_NAME)
   
     Returns:
@@ -29,10 +29,32 @@ def guardar_predicciones_finales(resultados_df: pd.DataFrame, nombre_archivo=Non
     ruta_archivo = f"predict/{nombre_archivo}_{timestamp}.csv"
   
     # Validar formato del DataFrame
+
+     # Validar que numero_cliente sea numérico
+    if not pd.api.types.is_numeric_dtype(resultados_df['numero_cliente']):
+        print("❌ ERROR: numero_cliente debe ser numérico")
+        raise ValueError("numero_cliente debe ser numérico")
+        # Convertir a numérico si es necesario
+        resultados_df['numero_cliente'] = pd.to_numeric(resultados_df['numero_cliente'], errors='coerce')
+    else:
+        print("✅ numero_cliente es numérico")
+   
+    
   
     # Validar tipos de datos
-  
-    # Validar valores de predict (deben ser 0 o 1)
+    valores_unicos = resultados_df['predict'].unique()
+    
+    # Verificar que solo contenga 0 y 1
+    valores_permitidos = {0, 1}
+    valores_encontrados = set(valores_unicos)
+    
+    if valores_encontrados.issubset(valores_permitidos):
+        print("✅ predict contiene solo 0 y 1")
+    else:
+        print("❌ ERROR: predict contiene valores diferentes de 0 y 1")
+        valores_invalidos = valores_encontrados - valores_permitidos
+        print(f"Valores inválidos encontrados: {valores_invalidos}")
+        raise ValueError("predict contiene valores diferentes de 0 y 1")
 
   
     # Guardar archivo
